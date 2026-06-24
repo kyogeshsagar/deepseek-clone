@@ -1,67 +1,26 @@
-// import { Webhook } from "svix";
-// import connectDB from "@/app/config/db";
-// import User from "@/app/models/User";
-// import { headers } from "next/headers";
-// import { NextRequest } from "next/server";
-
-// export async function POST(req) {
-//     const wh = new Webhook(process.env.SIGNING_SECRET)
-//     const headerPayload = await headers()
-//     const svixHeaders = {
-//         "svix-id":headerPayload.get("svix-id"),
-//         "svix-timestamp": headerPayload.get("svix-timestamp"),
-//         "svix-Signature":headerPayload.get("svix-Signature"),
-//     };
-
-//     // Get the payload and verify it
-
-//     const payload = await req.json();
-//     const body = JSON.stringify(payload);
-//     const {data ,type} = wh.verify(body, svixHeaders)
-
-//     // Prepare the user data to be saved in the database
-
-//     const userData = {
-//         _id: data.id,
-//         email:data.email_addresses[0].email_addresses,
-//         name: `${data.first_name} ${data.last_name}`,
-//         image: data.image_url,
-//     };
-
-//     await connectDB();
-
-//     switch (type) {
-//         case 'user.created':
-//             await User.create(userData)
-//         break;
-
-//          case 'user.updated':
-//             await User.findByIdAndUpdate(data.id, userData)
-//         break;
-
-//          case 'user.deleted':
-//             await User.findByIdAndDelete(data.id)
-//         break;
-
-//         default:
-//             break;
-//     }
-
-//     return NextRequest.json({message: "Event received"});
-
-// }
 import { Webhook } from "svix";
 import connectDB from "@/app/config/db";
 import User from "@/app/models/User";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
+// Test route
+export async function GET() {
+  return NextResponse.json({
+    success: true,
+    message: "Webhook route working",
+  });
+}
+
 export async function POST(req) {
   try {
     const SIGNING_SECRET = process.env.SIGNING_SECRET;
 
     if (!SIGNING_SECRET) {
-      throw new Error("SIGNING_SECRET is missing");
+      return NextResponse.json(
+        { success: false, error: "SIGNING_SECRET is missing" },
+        { status: 500 }
+      );
     }
 
     const wh = new Webhook(SIGNING_SECRET);
@@ -80,7 +39,7 @@ export async function POST(req) {
       !svixHeaders["svix-signature"]
     ) {
       return NextResponse.json(
-        { error: "Missing Svix headers" },
+        { success: false, error: "Missing Svix headers" },
         { status: 400 }
       );
     }
@@ -88,37 +47,69 @@ export async function POST(req) {
     const payload = await req.json();
     const body = JSON.stringify(payload);
 
-    const { data, type } = wh.verify(body, svixHeaders);
+    const evt = wh.verify(body, svixHeaders);
 
-    const userData = {
-      _id: data.id,
-      email: data.email_addresses[0].email_address,
-      name: `${data.first_name || ""} ${data.last_name || ""}`.trim(),
-      image: data.image_url,
-    };
+    const { data, type } = evt;
+
+    console.log("Webhook Event:", type);
+    console.log("User ID:", data?.id);
 
     await connectDB();
 
     switch (type) {
-      case "user.created":
-        await User.create(userData);
-        break;
+      case "user.created": {
+        const userData = {
+          _id: data.id,
+          name: `${data.first_name || ""} ${data.last_name || ""}`.trim(),
+          email:
+            data.email_addresses?.[0]?.email_address ||
+            "no-email@clerk.dev",
+          image: data.image_url || "",
+        };
 
-      case "user.updated":
-        await User.findByIdAndUpdate(data.id, userData);
-        break;
+        await User.findByIdAndUpdate(
+          data.id,
+          userData,
+          { upsert: true, new: true }
+        );
 
-      case "user.deleted":
+        console.log("User created:", userData);
+        break;
+      }
+
+      case "user.updated": {
+        const userData = {
+          name: `${data.first_name || ""} ${data.last_name || ""}`.trim(),
+          email:
+            data.email_addresses?.[0]?.email_address ||
+            "no-email@clerk.dev",
+          image: data.image_url || "",
+        };
+
+        await User.findByIdAndUpdate(
+          data.id,
+          userData,
+          { new: true }
+        );
+
+        console.log("User updated:", data.id);
+        break;
+      }
+
+      case "user.deleted": {
         await User.findByIdAndDelete(data.id);
+
+        console.log("User deleted:", data.id);
         break;
+      }
 
       default:
-        console.log(`Unhandled event type: ${type}`);
+        console.log("Unhandled event:", type);
     }
 
     return NextResponse.json({
       success: true,
-      message: "Event received",
+      message: "Webhook processed successfully",
     });
   } catch (error) {
     console.error("Webhook Error:", error);
@@ -126,7 +117,7 @@ export async function POST(req) {
     return NextResponse.json(
       {
         success: false,
-        error: error.message,
+        error: error?.message || "Unknown error",
       },
       { status: 500 }
     );
