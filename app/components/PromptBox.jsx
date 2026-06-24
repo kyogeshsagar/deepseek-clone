@@ -1,14 +1,27 @@
+"use client";
+
 import { assets } from "@/assets/assets";
 import Image from "next/image";
 import React, { useState } from "react";
 
-const PromptBox = ({ setIsLoading, isLoading }) => {
+const PromptBox = ({ isLoading, onSendPrompt }) => {
   const [prompt, setPrompt] = useState("");
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    const nextPrompt = prompt.trim();
+
+    if (!nextPrompt || isLoading) return;
+
+    await onSendPrompt(nextPrompt);
+    setPrompt("");
+  };
 
   return (
     <form
-      className={`w-full ${false ? "max-w-3xl" : "max-w-2xl"}
-    bg-[#404045] p-4 rounded-3xl mt-4 transition-all`}
+      onSubmit={handleSubmit}
+      className={`w-full max-w-2xl bg-[#404045] p-4 rounded-3xl mt-4 transition-all`}
     >
       <textarea
         className="outline-none w-full resize-none overflow-hidden
@@ -18,6 +31,7 @@ const PromptBox = ({ setIsLoading, isLoading }) => {
         required
         onChange={(e) => setPrompt(e.target.value)}
         value={prompt}
+        disabled={isLoading}
       />
 
       <div className="flex items-center justify-between text-sm">
@@ -43,11 +57,13 @@ const PromptBox = ({ setIsLoading, isLoading }) => {
         <div className="flex items-center gap-2">
           <Image className="w-4 cursor-pointer" src={assets.pin_icon} alt="" />
           <button
+            type="submit"
+            disabled={isLoading || !prompt.trim()}
             className={`${prompt ? "bg-primary" : "bg-[#71717a]"} rounded-full p-2 cursor-pointer`}
           >
             <Image
               className="w-3.5 aspect-square"
-              src={prompt ? assets.arrow_icon : assets.arrow_icon_dull}
+              src={isLoading || !prompt.trim() ? assets.arrow_icon_dull : assets.arrow_icon}
               alt=""
             />
           </button>

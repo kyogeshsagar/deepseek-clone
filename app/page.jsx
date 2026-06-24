@@ -5,14 +5,11 @@ import { useState } from "react";
 import Sidebar from "./components/Sidebar";
 import PromptBox from "./components/PromptBox";
 import Message from "./components/Message";
+import { useAppContext } from "./context/AppContext";
 
 export default function Home() {
-
-
-
 const [expand,setExpand] = useState(false);
-const [messages,setMessages] = useState([]);
-const [isLoading,setIsLoading] = useState(false);
+const { activeChat, isLoading, sendPrompt } = useAppContext();
 
   return (
     <div>
@@ -24,20 +21,22 @@ const [isLoading,setIsLoading] = useState(false);
             <Image className="opacity-70" src={assets.chat_icon} alt="" />
           </div>
           
-          {messages.length === 0 ? (
+          {!activeChat || activeChat.messages.length === 0 ? (
             <>
             <div className="flex items-center gap-3">
               <Image src={assets.logo_icon} alt="" className="h-16" />
-              <p className="text-2xl font-medium">Hi, I'm DeepSeek</p>
+              <p className="text-2xl font-medium">Hi, I&apos;m DeepSeek</p>
             </div>
             <p className="text-sm mt-2">How can I help you today?</p>
             </>
-          ):
-        (<div>
-          <Message role='user' content='What is next js' />
+          ):(
+        <div className="w-full overflow-y-auto px-2 py-6">
+          {activeChat.messages.map((message, index) => (
+            <Message key={`${activeChat.id}-${index}`} role={message.role} content={message.content} />
+          ))}
         </div>)
         }
-        <PromptBox isLoading={isLoading} setIsLoading={setIsLoading} />
+        <PromptBox isLoading={isLoading} onSendPrompt={sendPrompt} />
         <p className="text-xs absolute bottom-1 text-gray-500">AI-generated, for reference only</p>
         </div>
       </div>
